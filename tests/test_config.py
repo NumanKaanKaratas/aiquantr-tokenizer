@@ -39,6 +39,9 @@ training:
   max_samples: 1000000
   batch_size: 1000
   epochs: 2
+
+output:
+  path: "./output"
 """
 
 
@@ -77,11 +80,8 @@ class TestConfigManager(unittest.TestCase):
         """
         YAML dosyasından yapılandırma yükleme işlemini test eder.
         """
-        # ConfigManager örneği oluştur
-        config_manager = self.ConfigManager()
-        
-        # Yapılandırmayı yükle
-        config_manager.load_config(self.config_path)
+        # ConfigManager örneği oluştur ve yapılandırmayı doğrudan yükle
+        config_manager = self.ConfigManager(config_path=self.config_path)
         
         # Değerleri kontrol et
         self.assertEqual(config_manager.get("tokenizer.name"), "test_tokenizer")
@@ -100,8 +100,7 @@ class TestConfigManager(unittest.TestCase):
         """
         Varsayılan değerli get işlemini test eder.
         """
-        config_manager = self.ConfigManager()
-        config_manager.load_config(self.config_path)
+        config_manager = self.ConfigManager(config_path=self.config_path)
         
         # Varolan bir değer al
         self.assertEqual(config_manager.get("tokenizer.vocab_size"), 30000)
@@ -116,8 +115,7 @@ class TestConfigManager(unittest.TestCase):
         """
         Yapılandırma değiştirme ve kaydetme işlemlerini test eder.
         """
-        config_manager = self.ConfigManager()
-        config_manager.load_config(self.config_path)
+        config_manager = self.ConfigManager(config_path=self.config_path)
         
         # Değer değiştir
         config_manager.set("tokenizer.vocab_size", 50000)
@@ -132,8 +130,7 @@ class TestConfigManager(unittest.TestCase):
         config_manager.save_config(new_config_path)
         
         # Yeni dosyayı oku ve değerleri kontrol et
-        new_config_manager = self.ConfigManager()
-        new_config_manager.load_config(new_config_path)
+        new_config_manager = self.ConfigManager(config_path=new_config_path)
         
         self.assertEqual(new_config_manager.get("tokenizer.vocab_size"), 50000)
         self.assertEqual(new_config_manager.get("data.max_length"), 512)
@@ -142,8 +139,7 @@ class TestConfigManager(unittest.TestCase):
         """
         Yapılandırma birleştirme işlemini test eder.
         """
-        config_manager = self.ConfigManager()
-        config_manager.load_config(self.config_path)
+        config_manager = self.ConfigManager(config_path=self.config_path)
         
         # Yeni bir yapılandırma oluştur
         override_config = {
@@ -167,6 +163,33 @@ class TestConfigManager(unittest.TestCase):
         
         # Özel tokenler korundu mu?
         self.assertIn("[PAD]", config_manager.get("tokenizer.special_tokens"))
+
+    def test_validate_config(self):
+        """
+        Konfigürasyon doğrulama işlemini test eder.
+        """
+        # Geçerli bir yapılandırma
+        config_manager = self.ConfigManager(config_path=self.config_path)
+        
+        # output.path alanı gerekliydi, SAMPLE_CONFIG'e eklendiğinden şimdi geçerli olmalı
+        from aiquantr_tokenizer.config.config_manager import validate_config
+        self.assertTrue(validate_config(config_manager.config))
+        
+        # Geçersiz bir yapılandırma oluştur (data alanı olmayan)
+        invalid_config_path = os.path.join(self.temp_dir.name, "invalid_config.yaml")
+        with open(invalid_config_path, "w") as f:
+            f.write("""
+            # Geçersiz yapılandırma
+            tokenizer:
+              name: invalid_tokenizer
+            """)
+        
+        # Geçersiz yapılandırmayı yükle, ConfigManager en azından minimal yapıyı sağlamalı
+        invalid_config_manager = self.ConfigManager(config_path=invalid_config_path)
+        
+        # Temel alanlar hâlâ mevcut olmalı
+        self.assertIsNotNone(invalid_config_manager.get("tokenizer"))
+        self.assertIsNotNone(invalid_config_manager.get("data"))
 
 
 if __name__ == "__main__":

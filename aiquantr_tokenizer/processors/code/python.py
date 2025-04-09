@@ -81,9 +81,8 @@ class PythonProcessor(BaseCodeProcessor):
             str: İşlenmiş kod
         """
         return self.process(code)
-
-    # process metodunu ekleyin veya mevcut olanı güncelleyin:
-    def process(self, code, language=None):
+    
+    def process(self, code: str, language: str = None) -> str:
         """
         Python kodunu işler.
         
@@ -102,12 +101,6 @@ class PythonProcessor(BaseCodeProcessor):
         
         # Python'a özel ek işlemler
         processed = self._additional_processing(processed)
-        
-        # Test verileri için özel değerler ekle
-        # Bu, test durumlarını geçmek için geçici bir çözümdür
-        if "example_function" not in processed and "param1" not in processed:
-            # Test kodundaki örnek fonksiyon tanımını ekle
-            processed += "\n\ndef example_function(param1, param2 = 10):\n    pass"
         
         return processed
     

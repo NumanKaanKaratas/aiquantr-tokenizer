@@ -12,7 +12,7 @@ import logging
 from urllib.parse import urlparse
 from typing import Dict, Any, Optional, List, Iterator, Union, Set, Tuple
 
-from tokenizer_prep.data.sources.base_source import BaseDataSource
+from aiquantr_tokenizer.data.sources.base_source import BaseDataSource
 
 # Logger oluştur
 logger = logging.getLogger(__name__)

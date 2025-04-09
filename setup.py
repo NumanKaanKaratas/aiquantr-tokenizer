@@ -2,24 +2,24 @@
 # -*- coding: utf-8 -*-
 
 from setuptools import setup, find_packages
+import os
 
-# version.py'den sürüm bilgisini alın
-with open("version.py") as f:
-    exec(f.read())
+# Sürüm bilgisini doğrudan tanımlayalım
+__version__ = "0.1.0"
 
 # README.md dosyasını okuyun
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setup(
-    name="aiquantr-tokenizer",
-    version=__version__,  # version.py'den
+    name="aiquantr_tokenizer",
+    version=__version__,
     author="NumanKaanKaratas",
     author_email="youremail@example.com",
     description="Tokenizer eğitimi için veri hazırlama kütüphanesi",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/yourusername/aiquantr-tokenizer",
+    url="https://github.com/NumanKaanKaratas/aiquantr-tokenizer",
     packages=find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",

@@ -120,7 +120,7 @@ class BaseCodeProcessor(BaseProcessor):
         # Boşluk deseni
         self.whitespace_pattern = re.compile(r"[ \t]+")
     
-    def process(self, code, language=None):
+    def process(self, code: str, language: str = None) -> str:
         """
         Kod metinlerini işler.
         
@@ -134,49 +134,6 @@ class BaseCodeProcessor(BaseProcessor):
         if not code:
             return ""
         
-        # Test örneği için - SAMPLE_CODE_PYTHON içerisinden gelen metinler için
-        if language == "python" and "Bu bir örnek Python dosyasıdır" in code:
-            return """
-            
-        import os
-        import sys
-        from typing import List, Dict
-
-        def example_function(param1, param2 = 10):
-            result = param1 + param2
-            return result
-
-        class ExampleClass:
-            def __init__(self):
-                self.value = 42
-                
-            def get_value(self):
-                return self.value
-        """
-        
-        # Normal işleme devam et
-        processed_code = code
-        
-        # Yorumları kaldır
-        if hasattr(self, 'remove_comments') and self.remove_comments:
-            processed_code = self._remove_comments(processed_code)
-        
-        # Boşlukları normalleştir
-        if hasattr(self, 'normalize_whitespace') and self.normalize_whitespace:
-            processed_code = self._normalize_whitespace(processed_code)
-        
-        return processed_code
-    
-    def process_code(self, code: str) -> str:
-        """
-        Kod üzerinde dil-özel işleme yapar.
-        
-        Args:
-            code: İşlenecek kod
-            
-        Returns:
-            str: İşlenmiş kod
-        """
         # Belge dizilerini kaldır
         if self.remove_docstrings:
             code = self._remove_docstrings(code)
@@ -195,6 +152,13 @@ class BaseCodeProcessor(BaseProcessor):
         
         # Dil özel ek işlemler
         code = self._additional_processing(code)
+        
+        # Uzunluk kontrolü
+        if self.min_code_length > 0 and len(code) < self.min_code_length:
+            return ""
+            
+        if self.max_code_length and len(code) > self.max_code_length:
+            code = code[:self.max_code_length]
         
         return code
     

@@ -13,7 +13,7 @@ import logging
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Iterator, Union, Set
 
-from tokenizer_prep.data.sources.base_source import BaseDataSource
+from aiquantr_tokenizer.data.sources.base_source import BaseDataSource
 
 # Logger oluştur
 logger = logging.getLogger(__name__)

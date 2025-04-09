@@ -71,6 +71,36 @@ class PhpProcessor(BaseCodeProcessor):
             "variables_normalized": 0
         })
     
+    def process(self, text: str) -> str:
+        """
+        PHP kodunu işler.
+        
+        Args:
+            text: İşlenecek PHP kodu
+                
+        Returns:
+            str: İşlenmiş PHP kodu
+        """
+        if not text:
+            return ""
+        
+        # Temel işlemleri yap
+        processed = super().process(text)
+        
+        # PHP etiketlerini kaldır
+        if hasattr(self, 'remove_php_tags') and self.remove_php_tags:
+            matches = list(self.php_tag_pattern.finditer(processed))
+            processed = self.php_tag_pattern.sub('', processed)
+            self.stats["php_tags_removed"] += len(matches)
+
+        # HTML etiketlerini kaldır
+        if hasattr(self, 'remove_html') and self.remove_html:
+            matches = list(self.html_pattern.finditer(processed))
+            processed = self.html_pattern.sub('', processed)
+            self.stats["html_tags_removed"] += len(matches)
+        
+        return processed
+    
     def _additional_processing(self, code: str) -> str:
         """
         PHP koduna özel ek işlemler.
@@ -92,18 +122,6 @@ class PhpProcessor(BaseCodeProcessor):
             nowdoc_matches = list(self.nowdoc_pattern.finditer(code))
             code = self.nowdoc_pattern.sub('""', code)
             self.stats["heredoc_removed"] += len(nowdoc_matches)
-        
-        # PHP etiketlerini kaldır
-        if self.remove_php_tags:
-            matches = list(self.php_tag_pattern.finditer(code))
-            code = self.php_tag_pattern.sub('', code)
-            self.stats["php_tags_removed"] += len(matches)
-        
-        # HTML etiketlerini kaldır
-        if self.remove_html:
-            matches = list(self.html_pattern.finditer(code))
-            code = self.html_pattern.sub('', code)
-            self.stats["html_tags_removed"] += len(matches)
         
         # Değişken adlarını normalleştir
         if self.normalize_variables:
