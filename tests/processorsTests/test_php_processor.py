@@ -2,7 +2,7 @@
 PHP kod işleme sınıfı için testler.
 """
 
-from tests.test_processors import BaseProcessorTest
+from tests.processorsTests.test_processors import BaseProcessorTest
 
 class TestPhpProcessor(BaseProcessorTest):
     """
