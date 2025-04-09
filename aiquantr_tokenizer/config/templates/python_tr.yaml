@@ -1,0 +1,100 @@
+# aiquantr_tokenizer/config/templates/python_tr.yaml
+# Türkçe ve Python kodları için tokenizer yapılandırması
+
+# Versiyon
+version: 1.0
+
+# Genel ayarlar
+general:
+  language: "tr"
+  tokenizer_type: "bpe"
+  vocab_size: 32000  # Python tokenizer'lar için genellikle 32K token kullanılır
+  seed: 42
+  logging_level: "INFO"
+
+# Veri kaynakları
+data_sources:
+  - type: "huggingface"
+    dataset_name: "mc4"
+    subset: "tr"
+    split: "train"
+    streaming: true
+    max_samples: 500000  # Daha fazla Türkçe metin
+    
+  - type: "huggingface"
+    dataset_name: "codeparrot/github-code"
+    subset: "python"
+    split: "train"
+    streaming: true
+    max_samples: 300000  # Python kodu
+    
+  - type: "local"
+    path: "./data/tr_corpus"
+    file_types: ["txt", "md"]
+    recursive: true
+    
+  - type: "local"
+    path: "./data/python_codes"
+    file_types: ["py"]
+    recursive: true
+
+# İşlemciler
+processors:
+  text:
+    enabled: true
+    lowercase: false  # Python'da büyük/küçük harf önemlidir
+    normalize_unicode: true
+    strip_accents: false
+    strip_punctuation: false
+  
+  code:
+    enabled: true
+    languages: ["python"]
+    comment_handling: "keep"  # Yorumlar önemli bir bilgi kaynağı olabilir
+    remove_docstrings: false  # Dokümantasyon metinleri korunmalı
+    
+  deduplication:
+    enabled: true
+    method: "exact"
+    threshold: 0.9
+
+# Tokenizer eğitimi
+training:
+  num_workers: 8  # Paralel işleme
+  batch_size: 2000
+  special_tokens:
+    - "[UNK]"
+    - "[CLS]"
+    - "[SEP]"
+    - "[PAD]"
+    - "[MASK]"
+    - "[BOF]"  # Dosya başlangıcı (Beginning of File)
+    - "[EOF]"  # Dosya sonu (End of File)
+    - "[EOL]"  # Satır sonu (End of Line)
+    - "[INDENT]"  # Python girintisi
+    - "[DEDENT]"  # Python girintisi azaltma
+  
+  tokenizer:
+    model_type: "BPE"
+    add_prefix_space: false
+    trim_offsets: true
+    unk_token: "[UNK]"
+
+# Çıktı yapılandırması
+output:
+  path: "./output/python_tr_tokenizer"
+  save_format: "tokenizers"
+  push_to_hub: false
+  hub_repo: ""
+  hub_token: ""
+
+# Metrik değerlendirmesi
+metrics:
+  enabled: true
+  evaluate_on_samples: 2000
+  metrics_to_calculate:
+    - "vocabulary_coverage"
+    - "token_efficiency"
+    - "unknown_rate"
+    - "python_specific_metrics"  # Python'a özgü metrikler (örn. kod parçalarının korunması)
+  save_metrics: true

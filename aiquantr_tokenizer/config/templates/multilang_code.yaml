@@ -1,0 +1,142 @@
+# aiquantr_tokenizer/config/templates/multilang_code.yaml
+# Çok dilli kod için tokenizer yapılandırması
+
+# Versiyon
+version: 1.0
+
+# Genel ayarlar
+general:
+  language: "multilingual"
+  tokenizer_type: "bpe"
+  vocab_size: 48000  # Çoklu dil ve kod için daha büyük kelime dağarcığı
+  seed: 42
+  logging_level: "INFO"
+
+# Veri kaynakları
+data_sources:
+  # Kod veri setleri
+  - type: "huggingface"
+    dataset_name: "codeparrot/github-code"
+    subset: "python"
+    split: "train"
+    streaming: true
+    max_samples: 250000
+    
+  - type: "huggingface"
+    dataset_name: "codeparrot/github-code"
+    subset: "javascript"
+    split: "train"
+    streaming: true
+    max_samples: 200000
+    
+  - type: "huggingface"
+    dataset_name: "codeparrot/github-code"
+    subset: "cpp"
+    split: "train"
+    streaming: true
+    max_samples: 150000
+    
+  - type: "huggingface"
+    dataset_name: "codeparrot/github-code"
+    subset: "csharp"
+    split: "train"
+    streaming: true
+    max_samples: 150000
+    
+  # Dil veri setleri
+  - type: "huggingface"
+    dataset_name: "mc4"
+    subset: "tr"
+    split: "train"
+    streaming: true
+    max_samples: 200000
+    
+  - type: "huggingface"
+    dataset_name: "mc4"
+    subset: "en"
+    split: "train"
+    streaming: true
+    max_samples: 200000
+    
+  - type: "local"
+    path: "./data/code_samples"
+    file_types: ["py", "js", "cpp", "cs", "java"]
+    recursive: true
+
+# İşlemciler
+processors:
+  text:
+    enabled: true
+    lowercase: false  # Kod için büyük/küçük harf korunmalı
+    normalize_unicode: true
+    strip_accents: false
+    strip_punctuation: false
+  
+  code:
+    enabled: true
+    languages: ["python", "javascript", "cpp", "csharp", "java"]
+    comment_handling: "keep"
+    remove_docstrings: false
+    preserve_identifiers: true  # Tanımlayıcıları (değişken adları vb.) koru
+    
+  deduplication:
+    enabled: true
+    method: "minhash"  # Büyük veri setleri için daha etkili
+    threshold: 0.85
+
+# Tokenizer eğitimi
+training:
+  num_workers: 12  # Çok dilli ve büyük veri seti için daha fazla çalışan
+  batch_size: 4000
+  special_tokens:
+    # Genel tokenlar
+    - "[UNK]"
+    - "[CLS]"
+    - "[SEP]"
+    - "[PAD]"
+    - "[MASK]"
+    - "[BOS]"  # Cümle başlangıcı (Beginning of Sentence)
+    - "[EOS]"  # Cümle sonu (End of Sentence)
+    # Kod tokenları
+    - "[BOF]"  # Dosya başlangıcı
+    - "[EOF]"  # Dosya sonu
+    - "[EOL]"  # Satır sonu
+    - "[INDENT]"
+    - "[DEDENT]"
+    # Dil tanımlayıcılar
+    - "[TR]"  # Türkçe
+    - "[EN]"  # İngilizce
+    # Kod dili tanımlayıcılar
+    - "[PY]"  # Python
+    - "[JS]"  # JavaScript
+    - "[CPP]"  # C++
+    - "[CS]"  # C#
+    - "[JAVA]"  # Java
+  
+  tokenizer:
+    model_type: "BPE"
+    add_prefix_space: true  # Dil modelleri için önemli
+    trim_offsets: true
+    unk_token: "[UNK]"
+
+# Çıktı yapılandırması
+output:
+  path: "./output/multilang_code_tokenizer"
+  save_format: "tokenizers"
+  push_to_hub: false
+  hub_repo: ""
+  hub_token: ""
+  save_intermediate: true  # Ara çıktıları kaydet
+
+# Metrik değerlendirmesi
+metrics:
+  enabled: true
+  evaluate_on_samples: 5000  # Daha çok örnekle değerlendirme
+  metrics_to_calculate:
+    - "vocabulary_coverage"
+    - "token_efficiency"
+    - "unknown_rate"
+    - "language_specific_metrics"
+    - "code_specific_metrics"
+  save_metrics: true
+  cross_language_evaluation: true  # Diller arası performans değerlendirmesi

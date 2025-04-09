@@ -1,0 +1,6 @@
+Bu bir test metin dosyasıdır.
+
+Bu dosya, test_data_sources.py gibi test modülleri
+tarafından kullanılır.
+
+Birden fazla paragraf içerir.

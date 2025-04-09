@@ -1,0 +1,13 @@
+{
+    "text": "Bu bir JSON test dosyasıdır.",
+    "metadata": {
+      "source": "test",
+      "language": "tr",
+      "created_at": "2023-01-01"
+    },
+    "examples": [
+      {"id": 1, "value": "örnek 1"},
+      {"id": 2, "value": "örnek 2"},
+      {"id": 3, "value": "örnek 3"}
+    ]
+  }

@@ -1,0 +1,82 @@
+# aiquantr_tokenizer/config/default_config.yaml
+# Varsayılan tokenizer eğitim konfigürasyonu
+
+# Versiyon
+version: 1.0
+
+# Genel ayarlar
+general:
+  language: "tr"  # Varsayılan dil
+  tokenizer_type: "bpe"  # Varsayılan tokenizer tipi
+  vocab_size: 50000  # Varsayılan kelime dağarcığı boyutu
+  seed: 42  # Rasgelelik için seed değeri
+  logging_level: "INFO"  # Loglama seviyesi
+
+# Veri kaynakları
+data_sources:
+  - type: "huggingface"
+    dataset_name: "mc4"  # Varsayılan veri seti
+    subset: "tr"  # Alt küme (dil kodu)
+    split: "train"  # Hangi bölüm kullanılacak
+    streaming: true  # Akış modunda yükle
+    max_samples: 100000  # En fazla yüklenecek örnek sayısı
+    
+  - type: "local"
+    path: "./data/corpus"  # Yerel veri dizini
+    file_types: ["txt", "md"]  # İşlenecek dosya tipleri
+    recursive: true  # Alt dizinleri de dolaş
+
+# İşlemciler
+processors:
+  text:
+    enabled: true
+    lowercase: true
+    normalize_unicode: true
+    strip_accents: false
+    strip_punctuation: false
+  
+  code:
+    enabled: false
+    languages: ["python", "javascript"]
+    comment_handling: "keep"  # keep, strip, or separate
+    remove_docstrings: false
+    
+  deduplication:
+    enabled: true
+    method: "exact"  # exact, near_duplicate, or minhash
+    threshold: 0.9  # 0.0-1.0 arası (sadece near_duplicate için)
+
+# Tokenizer eğitimi
+training:
+  num_workers: 4  # İşlem paralelleştirme için iş parçacığı sayısı
+  batch_size: 1000  # Bellek verimli işlem için parti boyutu
+  special_tokens:
+    - "[UNK]"  # Bilinmeyen token
+    - "[CLS]"  # Sınıflandırma tokeni
+    - "[SEP]"  # Ayırıcı token
+    - "[PAD]"  # Dolgu tokeni
+    - "[MASK]"  # Maskeleme tokeni
+  
+  tokenizer:
+    model_type: "BPE"  # BPE, Unigram, WordPiece, or CharLevel
+    add_prefix_space: false
+    trim_offsets: true
+    unk_token: "[UNK]"
+
+# Çıktı yapılandırması
+output:
+  path: "./output"  # Çıktı dizini
+  save_format: "tokenizers"  # tokenizers, sentencepiece, huggingface
+  push_to_hub: false  # HuggingFace Hub'a yükle
+  hub_repo: ""  # Hub repo adı (kullanıcı/repo)
+  hub_token: ""  # Hub API token (güvenlik için boş bırakılmalı)
+
+# Metrik değerlendirmesi
+metrics:
+  enabled: true
+  evaluate_on_samples: 1000  # Değerlendirme için kullanılacak örnek sayısı
+  metrics_to_calculate:
+    - "vocabulary_coverage"
+    - "token_efficiency"
+    - "unknown_rate"
+  save_metrics: true  # Metrikleri kaydet
