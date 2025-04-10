@@ -8,6 +8,7 @@ yinelemeli olarak birleştiren bir alt kelime tokenizasyon algoritmasıdır.
 """
 
 import os
+import time 
 import json
 import logging
 import re

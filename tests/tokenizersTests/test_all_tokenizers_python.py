@@ -55,8 +55,12 @@ class TestAllTokenizersPython(unittest.TestCase):
             }
             
         except ImportError as e:
+            import traceback
+            print(f"HATA! Gerekli tokenizer modülleri bulunamadı: {e}")
+            print("TAM HATA İZİ:")
+            traceback.print_exc()
             self.skipTest(f"Gerekli tokenizer modülleri bulunamadı: {e}")
-        
+            
         # Proje kök dizinini bul
         self.project_root = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         
@@ -128,10 +132,26 @@ class TestAllTokenizersPython(unittest.TestCase):
                 return {"vocab_size": len(self.vocab)}
             
             def encode(self, text, add_special_tokens=True, **kwargs):
-                return [self.vocab.get(c, 0) for c in text]
-            
+                import time  # Direkt burada import edelim (geçici çözüm)
+                start_time = time.time()
+                
+                result = [self.vocab.get(c, 0) for c in text]
+                
+                # İstatistikleri güncelle
+                self.stats["num_encode_calls"] += 1
+                self.stats["total_encode_time"] += time.time() - start_time
+                return result
+
             def decode(self, ids, skip_special_tokens=True, **kwargs):
-                return "".join([self.ids_to_tokens.get(i, "") for i in ids])
+                import time  # Direkt burada import edelim (geçici çözüm)
+                start_time = time.time()
+                
+                result = "".join([self.ids_to_tokens.get(i, "") for i in ids])
+                
+                # İstatistikleri güncelle
+                self.stats["num_decode_calls"] += 1
+                self.stats["total_decode_time"] += time.time() - start_time
+                return result
             
             def get_vocab(self):
                 return dict(self.vocab)
