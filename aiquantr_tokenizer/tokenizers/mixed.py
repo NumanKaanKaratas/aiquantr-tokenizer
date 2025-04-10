@@ -211,7 +211,7 @@ class MixedTokenizer(BaseTokenizer):
         trainer.on_iteration_end(self, 0, metrics)
         
         # Eğitimi tamamla
-        self.is_trained = True
+        self._is_trained = True
         final_metrics = metrics.copy()
         final_metrics["training_results"] = training_results
         

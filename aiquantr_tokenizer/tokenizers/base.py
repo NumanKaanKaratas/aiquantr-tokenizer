@@ -72,7 +72,27 @@ class BaseTokenizer(ABC):
         
         # Eğitim ile ilgili meta veriler
         self.metadata = {}
-        self.is_trained = False
+        self._is_trained = False  # self.is_trained yerine self._is_trained kullanın
+
+    @property
+    def is_trained(self):
+        """
+        Tokenizer'ın eğitilip eğitilmediğini döndürür.
+        
+        Returns:
+            bool: Tokenizer eğitildi mi
+        """
+        return getattr(self, "_is_trained", False)
+
+    @is_trained.setter
+    def is_trained(self, value):
+        """
+        Tokenizer'ın eğitim durumunu ayarlar.
+        
+        Args:
+            value: Yeni eğitim durumu
+        """
+        self._is_trained = bool(value)
 
     def normalize_text(self, text: str, rule: str = "nmt_nfkc") -> str:
         """

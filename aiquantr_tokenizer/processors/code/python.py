@@ -31,6 +31,7 @@ class PythonProcessor(BaseCodeProcessor):
         remove_type_hints: bool = False,
         remove_decorators: bool = False,
         normalize_imports: bool = False,
+        remove_empty_lines: bool = False,
         **kwargs
     ):
         """
@@ -56,6 +57,7 @@ class PythonProcessor(BaseCodeProcessor):
         self.remove_type_hints = remove_type_hints
         self.remove_decorators = remove_decorators
         self.normalize_imports = normalize_imports
+        self.remove_empty_lines = remove_empty_lines
         
         # Ek regex desenleri
         self.decorator_pattern = re.compile(r"^\s*@.*?$", re.MULTILINE)

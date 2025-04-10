@@ -34,6 +34,7 @@ class BaseCodeProcessor(BaseProcessor):
         docstring_delimiters: Optional[List[Tuple[str, str]]] = None,
         remove_comments: bool = False,
         remove_docstrings: bool = False,
+        remove_empty_lines: bool = False,
         remove_string_literals: bool = False,
         normalize_whitespace: bool = True,
         keep_indentation: bool = True,
@@ -72,6 +73,7 @@ class BaseCodeProcessor(BaseProcessor):
         self.remove_comments = remove_comments
         self.remove_docstrings = remove_docstrings
         self.remove_string_literals = remove_string_literals
+        self.remove_empty_lines = remove_empty_lines
         self.normalize_whitespace = normalize_whitespace
         self.keep_indentation = keep_indentation
         self.min_code_length = min_code_length

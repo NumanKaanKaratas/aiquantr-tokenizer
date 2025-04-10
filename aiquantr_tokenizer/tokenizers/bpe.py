@@ -397,7 +397,7 @@ class BPETokenizer(BaseTokenizer):
                 break
         
         # Eğitimi tamamla
-        self.is_trained = True
+        self._is_trained = True
         final_metrics = {
             "vocab_size": len(self.encoder),
             "num_merges": len(self.bpe_ranks),

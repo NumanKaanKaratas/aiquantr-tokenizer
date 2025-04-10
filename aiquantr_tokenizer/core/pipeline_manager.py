@@ -529,7 +529,7 @@ class PipelineManager:
         ])
         
         # Tokenizer'ı değerlendir
-        from ..tokenizers.evaluation import evaluate_tokenizer
+        from ...Eski.evaluation import evaluate_tokenizer
         
         logger.info(f"Tokenizer değerlendiriliyor: {len(metrics)} metrik, {len(texts)} metin")
         evaluation_results = evaluate_tokenizer(self.tokenizer, texts, metrics)

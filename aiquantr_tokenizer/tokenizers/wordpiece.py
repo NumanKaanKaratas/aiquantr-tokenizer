@@ -344,7 +344,7 @@ class WordPieceTokenizer(BaseTokenizer):
         self.cache = {}
         
         # Eğitimi tamamla
-        self.is_trained = True
+        self._is_trained = True
         final_metrics = {
             "vocab_size": len(self.vocab),
             "num_candidates": len(subword_freqs),

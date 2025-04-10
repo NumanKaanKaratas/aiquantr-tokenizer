@@ -201,7 +201,7 @@ class SentencePieceTokenizer(BaseTokenizer):
                 self.sp_model.load(model_file)
                 
                 # Eğitim başarılı oldu
-                self.is_trained = True
+                self._is_trained = True
                 
                 # İstatistikleri güncelle
                 vocab_size = self.sp_model.get_piece_size()

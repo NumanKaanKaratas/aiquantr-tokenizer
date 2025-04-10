@@ -38,7 +38,7 @@ class UnigramTokenizer(BaseTokenizer):
         min_frequency: int = 2,
         special_tokens: Optional[Dict[str, str]] = None,
         character_coverage: float = 0.9995,
-        split_pattern: str = r"\s+",
+        split_pattern: str = r"\\s+",
         unk_piece: str = "[UNK]",
         split_by_whitespace: bool = True,
         normalization_rule: str = "nmt_nfkc",
@@ -53,7 +53,7 @@ class UnigramTokenizer(BaseTokenizer):
             min_frequency: Minimum token frekansı (varsayılan: 2)
             special_tokens: Özel token eşlemeleri (varsayılan: None)
             character_coverage: Karakter kapsama oranı (varsayılan: 0.9995)
-            split_pattern: İlk ayrım için kullanılacak desen (varsayılan: r"\s+")
+            split_pattern: İlk ayrım için kullanılacak desen (varsayılan: r"\\s+")
             unk_piece: Bilinmeyen token (varsayılan: "[UNK]")
             split_by_whitespace: Boşlukla ayır (varsayılan: True)
             normalization_rule: Normalizasyon kuralı (varsayılan: "nmt_nfkc")
@@ -497,7 +497,7 @@ class UnigramTokenizer(BaseTokenizer):
         self.ids_to_pieces = {idx: piece for piece, idx in self.vocab.items()}
         
         # Eğitimi tamamla
-        self.is_trained = True
+        self._is_trained = True
         final_metrics = {
             "vocab_size": len(self.vocab),
             "initial_pieces": initial_pieces,

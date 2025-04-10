@@ -15,7 +15,7 @@ from typing import List, Dict, Any, Union, Optional, Set, Tuple, Callable
 
 import numpy as np
 
-from .base import BaseTokenizer
+from ..aiquantr_tokenizer.tokenizers.base import BaseTokenizer
 
 # Logger oluştur
 logger = logging.getLogger(__name__)
