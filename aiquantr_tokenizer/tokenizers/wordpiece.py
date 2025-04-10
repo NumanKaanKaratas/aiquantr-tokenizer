@@ -433,10 +433,10 @@ class WordPieceTokenizer(BaseTokenizer):
         return tokens
     
     def decode(
-        self,
-        ids: List[int],
-        skip_special_tokens: bool = True,
-        **kwargs
+    self,
+    ids: List[int],
+    skip_special_tokens: bool = True,
+    **kwargs
     ) -> str:
         """
         Token ID'lerini metne dönüştürür.
@@ -475,24 +475,33 @@ class WordPieceTokenizer(BaseTokenizer):
             else:
                 tokens.append(self.special_tokens["unk_token"])
         
-        # WordPiece tokenlarını birleştir
-        text = ""
-        current_word = ""
+        # WordPiece tokenları birleştirme - geliştirilmiş algoritma
+        parts = []
+        current_part = ""
         
         for token in tokens:
             if token.startswith(self.wordpiece_prefix):
-                current_word += token[len(self.wordpiece_prefix):]
+                # Alt kelime - prefix olmadan ekle
+                current_part += token[len(self.wordpiece_prefix):]
             else:
-                if current_word:
-                    text += current_word + " "
-                    current_word = ""
-                text += token + " "
+                # Yeni kelime
+                if current_part:
+                    parts.append(current_part)
+                    current_part = ""
+                parts.append(token)
         
-        if current_word:
-            text += current_word
-            
-        # Sondaki boşluğu temizle
-        text = text.rstrip()
+        # Son kelimeyi ekle
+        if current_part:
+            parts.append(current_part)
+        
+        # Düzgün boşluklarla metni oluştur
+        text = ""
+        for i, part in enumerate(parts):
+            # Noktalama işaretleri için özel kontroller
+            if i > 0 and not (part.startswith((".", ",", "!", "?", ":", ";", ")", "]", "}", "'", '"')) or 
+                        parts[i-1].endswith(("(", "[", "{", "'", '"'))):
+                text += " "
+            text += part
         
         # İstatistikleri güncelle
         self.stats["num_decode_calls"] += 1

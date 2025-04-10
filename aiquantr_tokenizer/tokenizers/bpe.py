@@ -480,10 +480,10 @@ class BPETokenizer(BaseTokenizer):
         return tokens
     
     def decode(
-        self,
-        ids: List[int],
-        skip_special_tokens: bool = True,
-        **kwargs
+    self,
+    ids: List[int],
+    skip_special_tokens: bool = True,
+    **kwargs
     ) -> str:
         """
         Token ID'lerini metne dönüştürür.
@@ -503,50 +503,56 @@ class BPETokenizer(BaseTokenizer):
             self.stats["total_decode_time"] += time.time() - start_time
             return ""
         
-        # Özel token ID'lerini belirle
+        # 1. ID'leri doğru tokenlara çevir
+        tokens = []
         special_token_ids = set()
+        
         if skip_special_tokens:
             special_token_ids = {
                 self.encoder.get(token) for token in self.special_tokens.values()
                 if token in self.encoder
             }
         
-        # Token ID'lerini metne dönüştür
-        text = ""
-        buffer = []
-        
         for token_id in ids:
             if token_id in special_token_ids:
                 continue
-                
-            token = self.decoder.get(token_id, self.special_tokens["unk_token"])
-            buffer.append(token)
+            
+            if token_id in self.decoder:
+                tokens.append(self.decoder[token_id])
+            else:
+                tokens.append(self.special_tokens["unk_token"])
         
-        # Tampondaki karakterleri birleştir
-        text = "".join(buffer)
+        # 2. Tokenları özel işlem yapmadan birleştir
+        raw_text = "".join(tokens)
         
-        # Eğer byte fallback kullanılıyorsa, karakterleri UTF-8'e dönüştür
+        # 3. Byte fallback kullanılıyorsa, UTF-8 dönüşümü yap
         if self.byte_fallback:
-            bytes_list = []
-            for c in text:
-                if c in self.byte_decoder:
-                    bytes_list.append(self.byte_decoder[c])
-                else:
-                    # Normal karakterse direkt Unicode değerini kullan
-                    bytes_list.extend(ord(c).to_bytes(2, byteorder='big'))
-                    
             try:
-                text = bytes(bytes_list).decode("utf-8", errors="replace")
-            except Exception:
-                # Dönüşümde hata olursa orijinal metni koru
-                pass
+                byte_list = []
+                for c in raw_text:
+                    # Eğer karakter byte_decoder'da varsa, doğrudan byte değerini kullan
+                    if c in self.byte_decoder:
+                        byte_list.append(self.byte_decoder[c])
+                    # Yoksa, karakteri UTF-8 olarak encode et
+                    else:
+                        # Maksimum 4 byte olabilir
+                        char_bytes = c.encode('utf-8')
+                        byte_list.extend(char_bytes)
+                
+                # Byte listesini UTF-8 metin olarak decode et
+                text = bytes(byte_list).decode('utf-8', errors='replace')
+            except Exception as e:
+                logger.warning(f"Byte dönüşüm hatası: {e}")
+                text = raw_text
+        else:
+            text = raw_text
         
         # İstatistikleri güncelle
         self.stats["num_decode_calls"] += 1
         self.stats["total_decode_time"] += time.time() - start_time
         
         return text
-    
+        
     def get_vocab(self) -> Dict[str, int]:
         """
         Tokenizer'ın sözlüğünü döndürür.

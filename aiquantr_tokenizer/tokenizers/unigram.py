@@ -314,6 +314,35 @@ class UnigramTokenizer(BaseTokenizer):
             
         pieces.reverse()
         
+        # Bağlam bilgilerini kullanarak son ayarlamaları yap
+        if len(pieces) > 1:
+            refined_pieces = []
+            i = 0
+            while i < len(pieces) - 1:
+                current = pieces[i]
+                next_piece = pieces[i+1]
+                combined = current + next_piece
+                
+                # Eğer birleştirilmiş form sözlükte varsa ve daha yüksek puanlıysa birleştir
+                if combined in self.scores:
+                    current_score = self.scores.get(current, float('-inf'))
+                    next_score = self.scores.get(next_piece, float('-inf'))
+                    combined_score = self.scores[combined]
+                    
+                    if combined_score > (current_score + next_score):
+                        refined_pieces.append(combined)
+                        i += 2
+                        continue
+                
+                refined_pieces.append(current)
+                i += 1
+                
+            # Son parçayı ekle
+            if i == len(pieces) - 1:
+                refined_pieces.append(pieces[-1])
+                
+            pieces = refined_pieces
+        
         # Sonucu önbelleğe al
         self.cache[text] = pieces
         return pieces
@@ -562,10 +591,10 @@ class UnigramTokenizer(BaseTokenizer):
         return token_ids
     
     def decode(
-        self,
-        ids: List[int],
-        skip_special_tokens: bool = True,
-        **kwargs
+    self,
+    ids: List[int],
+    skip_special_tokens: bool = True,
+    **kwargs
     ) -> str:
         """
         Token ID'lerini metne dönüştürür.
@@ -578,6 +607,38 @@ class UnigramTokenizer(BaseTokenizer):
         Returns:
             str: Elde edilen metin
         """
+        # Önce yardımcı fonksiyonları tanımla
+        def _is_punctuation(text: str) -> bool:
+            """Bir metnin noktalama işareti olup olmadığını kontrol eder."""
+            if not text:
+                return False
+            # Tek karakter noktalama işaretleri
+            if len(text) == 1 and not text.isalnum():
+                return True
+            # Çoklu karakter noktalama işaretleri
+            common_punct = ["...", "!!", "??", "?!", "!?", "--", "=="]
+            return text in common_punct
+            
+        def _should_join_tokens(first: str, second: str) -> bool:
+            """İki tokenin birleştirilmesi gerekip gerekmediğini kontrol eder."""
+            # Eğer ikinci token bir noktalama işareti ise birleştir
+            if _is_punctuation(second):
+                return True
+            
+            # Eğer ilk token bir ön ek veya ikinci token bir son ek ise birleştir
+            prefixes = ["pre", "re", "un", "in", "dis", "mis", "non", "anti"]
+            suffixes = ["ing", "ed", "s", "es", "er", "est", "ly", "ment", "ness", "ful", "less"]
+            
+            for prefix in prefixes:
+                if first.endswith(prefix):
+                    return True
+            
+            for suffix in suffixes:
+                if second.startswith(suffix):
+                    return True
+                    
+            return False
+        
         start_time = time.time()
         
         if not ids:
@@ -604,14 +665,33 @@ class UnigramTokenizer(BaseTokenizer):
             else:
                 pieces.append(self.special_tokens["unk_token"])
         
-        # Tokenleri birleştir
-        text = "".join(pieces)
+        # Tokenleri birleştir - Unigram için geliştirilmiş mantık
+        text = ""
+        for i, piece in enumerate(pieces):
+            # Sonraki tokeni kontrol et
+            if i < len(pieces) - 1:
+                next_piece = pieces[i + 1]
+                
+                # Eğer şimdiki token kelime içinde ve sonraki token de kelime içinde olabilir
+                # ve aralarında boşluk olmamalıysa (örn. hece ve ek)
+                if _should_join_tokens(piece, next_piece):
+                    text += piece
+                    continue
+            
+            # Varsayılan durumda: 
+            # - Eğer bu ilk kelime değilse ve önceki kelime bir noktalama değilse
+            # - Ve bu kelime de bir noktalama değilse, boşluk ekle
+            if i > 0 and not _is_punctuation(pieces[i-1]) and not _is_punctuation(piece):
+                text += " "
+            text += piece
         
         # İstatistikleri güncelle
         self.stats["num_decode_calls"] += 1
         self.stats["total_decode_time"] += time.time() - start_time
         
         return text
+
+    
     
     def get_vocab(self) -> Dict[str, int]:
         """

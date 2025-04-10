@@ -420,9 +420,13 @@ class MixedTokenizer(BaseTokenizer):
             tokenizer_dir = path / tokenizer_name
             tokenizer.save(tokenizer_dir)
             
-            # Tokenizer bilgilerini yapılandırmaya ekle
+            # Tokenizer bilgilerini yapılandırmaya ekle - tip bilgisini doğru şekilde kaydet
+            class_name = tokenizer.__class__.__name__
+            tokenizer_type = class_name.lower().replace("tokenizer", "")  # örn: ByteLevelTokenizer -> bytelevel
+            
             config["tokenizers"][tokenizer_name] = {
-                "class": tokenizer.__class__.__name__,
+                "class": class_name,
+                "type": tokenizer_type,  # type anahtarını ekle (factory.py'daki TOKENIZER_TYPES ile uyumlu olacak şekilde)
                 "path": tokenizer_name
             }
             
@@ -458,7 +462,7 @@ class MixedTokenizer(BaseTokenizer):
         Raises:
             ValueError: Model yüklenemezse
         """
-        from .factory import load_tokenizer_from_path
+        from .factory import load_tokenizer_from_path, TOKENIZER_TYPES
         
         path = Path(path)
         
@@ -486,7 +490,25 @@ class MixedTokenizer(BaseTokenizer):
             tokenizer_path = path / tokenizer_info["path"]
             
             try:
-                tokenizers[tokenizer_name] = load_tokenizer_from_path(tokenizer_path)
+                # İlk olarak direkt sınıf adını kullan
+                class_name = tokenizer_info.get("class", "").lower()
+                tokenizer_type = tokenizer_info.get("type", "").lower()
+                
+                # Factory'deki TOKENIZER_TYPES anahtarlarıyla eşleşmesi için düzenle
+                if tokenizer_type.endswith("tokenizer"):
+                    tokenizer_type = tokenizer_type[:-9]  # "tokenizer" son ekini kaldır
+                elif class_name.endswith("tokenizer"):
+                    class_name = class_name[:-9]  # "tokenizer" son ekini kaldır
+                
+                # Önce tip ile dene, sonra sınıf adı ile
+                if tokenizer_type in TOKENIZER_TYPES:
+                    tokenizers[tokenizer_name] = TOKENIZER_TYPES[tokenizer_type].load(tokenizer_path)
+                elif class_name in TOKENIZER_TYPES:
+                    tokenizers[tokenizer_name] = TOKENIZER_TYPES[class_name].load(tokenizer_path)
+                else:
+                    # Genel yükleyici ile dene
+                    tokenizers[tokenizer_name] = load_tokenizer_from_path(tokenizer_path)
+                    
             except Exception as e:
                 logger.warning(f"'{tokenizer_name}' tokenizer'ı yüklenirken hata: {e}")
                 

@@ -33,8 +33,7 @@ __all__ = [
     
     # Yardımcı işlevler
     "load_tokenizer",
-    "create_tokenizer",
-    "evaluate_tokenizer"
+    "create_tokenizer"
 ]
 
 # Logger oluştur
@@ -81,25 +80,3 @@ def load_tokenizer(path: Union[str, Path], tokenizer_type: Optional[str] = None)
     logger.info(f"Tokenizer yüklendi: {tokenizer.__class__.__name__}")
     return tokenizer
 
-
-def evaluate_tokenizer(
-    tokenizer: BaseTokenizer,
-    texts: List[str],
-    metrics: Optional[List[str]] = None
-) -> Dict[str, Any]:
-    """
-    Tokenizer'ı değerlendirir.
-    
-    Args:
-        tokenizer: Değerlendirilecek tokenizer
-        texts: Test metinleri
-        metrics: Hesaplanacak metrikler (varsayılan: None - tüm metrikler)
-        
-    Returns:
-        Dict[str, Any]: Değerlendirme sonuçları
-    """
-    from .evaluation import evaluate_tokenizer as evaluate_func
-    
-    results = evaluate_func(tokenizer, texts, metrics)
-    logger.info(f"Tokenizer değerlendirmesi tamamlandı: {len(texts)} örnek üzerinde")
-    return results

@@ -123,92 +123,118 @@ class PythonProcessor(BaseCodeProcessor):
         
         # Tip işaretlerini kaldır
         if self.remove_type_hints:
-            # Geliştirilmiş tip işareti kaldırma
-            # Satır satır işle, özellikle fonksiyon tanımlarını düzgün ele al
+            # 1. Satır sonundaki eşitlik yerinde dönüş tip belirteçlerini temizle
+            code = re.sub(r'(\w+\s*=\s*{[\s\S]*?})\s*->\s*[\w\[\],\.\s]+', r'\1', code)
+
+            # 2. Function parameter tip işaretlerini temizle - başlangıç çıktısında sorunlu olan yerler
+            code = re.sub(r'([a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*[a-zA-Z_][a-zA-Z0-9_\[\],\.\s]+\s*=\s*', r'\1 = ', code)
+            
+            # 3. Satır içi değişken tip işaretlerini temizle
+            code = re.sub(r'([a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*([a-zA-Z_][a-zA-Z0-9_\[\],\.\s]+)(?=\s*(?:,|\)))', r'\1', code)
+            
+            # 4. Fonksiyon dönüş tiplerini temizle
+            code = re.sub(r'(\))\s*->\s*[a-zA-Z_][a-zA-Z0-9_\[\],\.\s]+\s*:', r'\1:', code)
+            
+            # 5. Standart parametreye sahip olmayan fonksiyon dönüş tiplerini temizle
+            code = re.sub(r'(\))\s*->\s*[a-zA-Z_][a-zA-Z0-9_\[\],\.\s]+', r'\1', code)
+            
+            # 6. Fonksiyon parametreleri üzerinde daha kapsamlı bir işlem yapalım
             lines = code.split('\n')
             processed_lines = []
-            
+
             for line in lines:
-                # Fonksiyon tanımı satırı mı kontrol et
-                if re.match(r'\s*def\s+\w+\s*\(', line):
-                    # Fonksiyon adını, parametrelerini ve dönüş tipini ayır
-                    match = re.match(r'(\s*def\s+\w+\s*\()(.*)(\)\s*(?:->\s*[^:]+\s*)?:.*)', line)
-                    if match:
-                        prefix, params, suffix = match.groups()
-                        
-                        # Dönüş tipini kaldır
-                        suffix = re.sub(r'\s*->\s*[^:]+\s*:', ':', suffix)
-                        
-                        # Parametreleri parsle
-                        if params.strip():
-                            # Parametreleri virgülle ayır (parantez seviyesini takip ederek)
+                # Fonksiyon tanımlarında tip işaretlerini kaldır
+                if re.match(r'^\s*def\s+\w+\s*\(', line) or '=' in line:
+                    # Parametre listesindeki "param: type" kalıplarını bul ve sadece "param" olarak değiştir
+                    in_param_list = False
+                    new_line = ""
+                    param_start = 0
+                    param_depth = 0
+                    
+                    # Parametre listesini bul ve parametreleri tek tek işle
+                    for i, c in enumerate(line):
+                        if c == '(' and not in_param_list:
+                            in_param_list = True
+                            new_line += line[:i+1]
+                            param_start = i + 1
+                        elif c == '(' and in_param_list:
+                            param_depth += 1
+                            new_line += c
+                        elif c == ')' and in_param_list and param_depth > 0:
+                            param_depth -= 1
+                            new_line += c
+                        elif c == ')' and in_param_list and param_depth == 0:
+                            # Parametre listesinin sonuna gelindi, parametreyi işle
+                            param_text = line[param_start:i]
+                            
+                            # Parametreleri virgülle ayır ve her birini işle
+                            params = []
                             param_parts = []
-                            param_start = 0
-                            paren_level = 0
+                            temp_start = 0
+                            temp_depth = 0
                             
-                            for i, char in enumerate(params):
-                                if char in '([{':
-                                    paren_level += 1
-                                elif char in ')]}':
-                                    paren_level -= 1
-                                elif char == ',' and paren_level == 0:
-                                    param_parts.append(params[param_start:i].strip())
-                                    param_start = i + 1
+                            for j, pc in enumerate(param_text):
+                                if pc in '([{':
+                                    temp_depth += 1
+                                elif pc in ')]}':
+                                    temp_depth -= 1
+                                elif pc == ',' and temp_depth == 0:
+                                    param_parts.append(param_text[temp_start:j])
+                                    temp_start = j + 1
                             
-                            # Son parametreyi ekle
-                            if param_start < len(params):
-                                param_parts.append(params[param_start:].strip())
+                            # Son parametreyi de ekle
+                            if temp_start < len(param_text):
+                                param_parts.append(param_text[temp_start:])
                             
-                            # Her parametreden tip işaretlerini kaldır
-                            clean_params = []
-                            for param in param_parts:
-                                # Parametre adını ve olası varsayılan değeri ayır
-                                if ':' in param:
-                                    # "param: type" veya "param: type = value" formatı
-                                    parts = param.split(':', 1)
-                                    param_name = parts[0].strip()
-                                    
-                                    # Varsayılan değer kontrolü
-                                    if '=' in parts[1]:
-                                        # "param: type = value" formatı
-                                        default_value = re.search(r'=\s*(.*)', parts[1]).group(1).strip()
-                                        clean_params.append(f"{param_name} = {default_value}")
+                            # Parametreleri temizle
+                            for part in param_parts:
+                                part = part.strip()
+                                if ':' in part:
+                                    name_part = part.split(':', 1)[0].strip()
+                                    if '=' in part:
+                                        # "param: type = value" durumu
+                                        default_value = part.split('=', 1)[1].strip()
+                                        params.append(f"{name_part} = {default_value}")
                                     else:
-                                        # "param: type" formatı, sadece param_name gerekli
-                                        clean_params.append(param_name)
-                                elif '=' in param:
-                                    # "param = value" formatı, tip işareti yok
-                                    clean_params.append(param)
+                                        # "param: type" durumu
+                                        params.append(name_part)
                                 else:
-                                    # Sadece parametre adı
-                                    clean_params.append(param)
-                            
-                            # Temiz parametreleri birleştir
-                            clean_params_str = ", ".join(clean_params)
-                            
-                            # Yeni fonksiyon tanımını oluştur
-                            line = f"{prefix}{clean_params_str}{suffix}"
+                                    # Tip işareti olmayan parametre
+                                    params.append(part)
+                                    
+                            # Parametreleri birleştir ve satırı oluştur
+                            new_line += ", ".join(params) + c
+                            in_param_list = False
+                        elif not in_param_list:
+                            new_line += c
                         else:
-                            # Parametresiz fonksiyon
-                            line = f"{prefix}{suffix}"
-                
-                # Normal değişken tanımlarından tip işaretlerini kaldır
-                else:
-                    # Değişken tanımlarındaki tip işaretlerini kaldır - PEP 8 uyumlu boşluklama ile
-                    line = re.sub(r'(\b[a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*[A-Za-z0-9_\[\]\'\"\.]+\s*=\s*', 
-                                r'\1 = ', 
-                                line)
+                            # Parametre listesi içindeyiz
+                            continue
+                            
+                    # Eğer parametre listesi bulunamazsa orijinal satırı kullan
+                    if new_line:
+                        line = new_line
+                    
+                    # Dönüş tipi işaretlerini kaldır
+                    line = re.sub(r'(\))\s*->\s*[^:]+:', r'\1:', line)
                 
                 processed_lines.append(line)
             
             code = '\n'.join(processed_lines)
+            
+            # Son olarak genel bir temizlik yap
+            # Değişken tanımlamalarındaki son kalan tip işaretlerini kaldır
+            code = re.sub(r'(\w+)\s*:\s*[A-Za-z0-9_\[\]\'\"\.]+\s*=', r'\1 =', code)
+            
+            # Doğrudan "= ..." ifadelerinden önceki tip işaretlerini kaldır 
+            code = re.sub(r'([a-zA-Z0-9_]+)\s*:\s*[A-Za-z0-9_\[\]\'\"\.]+\s*=', r'\1 =', code)
         
         # İmportları normalleştir
         if self.normalize_imports:
             code = self._normalize_imports(code)
         
         return code
-    
+        
     def _normalize_imports(self, code: str) -> str:
         """
         Python import ifadelerini normalleştir.

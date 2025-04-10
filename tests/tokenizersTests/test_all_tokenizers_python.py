@@ -11,6 +11,7 @@ import tempfile
 from pathlib import Path
 import json
 from typing import Dict, Any, List, Type, Optional
+import re
 
 from aiquantr_tokenizer.tokenizers.base import BaseTokenizer, TokenizerTrainer
 from aiquantr_tokenizer.processors.code.python import PythonProcessor
@@ -62,14 +63,16 @@ class TestAllTokenizersPython(unittest.TestCase):
             self.skipTest(f"Gerekli tokenizer modülleri bulunamadı: {e}")
             
         # Proje kök dizinini bul
-        self.project_root = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        current_path = Path(os.path.abspath(__file__))
+        self.project_root = current_path.parent.parent.parent
+        print(f"Proje kök dizini: {self.project_root}")
         
         # İşlenecek dosyaların yolları
         self.python_files = {
             "config_manager": self.project_root / "aiquantr_tokenizer" / "config" / "config_manager.py",
+            "python_processor": self.project_root / "aiquantr_tokenizer" / "processors" / "code" / "python.py",
             "base_tokenizer": self.project_root / "aiquantr_tokenizer" / "tokenizers" / "base.py",
             "bpe_tokenizer": self.project_root / "aiquantr_tokenizer" / "tokenizers" / "bpe.py",
-            "python_processor": self.project_root / "aiquantr_tokenizer" / "processors" / "code" / "python.py"
         }
         
         # Dosyaların varlığını kontrol et
@@ -118,6 +121,13 @@ class TestAllTokenizersPython(unittest.TestCase):
                 )
                 self.vocab = {}
                 self.ids_to_tokens = {}
+                # İstatistik sözlüğünü ekle
+                self.stats = {
+                    "num_encode_calls": 0,
+                    "total_encode_time": 0,
+                    "num_decode_calls": 0,
+                    "total_decode_time": 0
+                }
             
             def train(self, texts, trainer=None, **kwargs):
                 # Basit bir karakter tabanlı sözlük oluştur
@@ -132,7 +142,7 @@ class TestAllTokenizersPython(unittest.TestCase):
                 return {"vocab_size": len(self.vocab)}
             
             def encode(self, text, add_special_tokens=True, **kwargs):
-                import time  # Direkt burada import edelim (geçici çözüm)
+                import time  # Zaman modülünü import et
                 start_time = time.time()
                 
                 result = [self.vocab.get(c, 0) for c in text]
@@ -140,18 +150,20 @@ class TestAllTokenizersPython(unittest.TestCase):
                 # İstatistikleri güncelle
                 self.stats["num_encode_calls"] += 1
                 self.stats["total_encode_time"] += time.time() - start_time
+                
                 return result
-
+            
             def decode(self, ids, skip_special_tokens=True, **kwargs):
-                import time  # Direkt burada import edelim (geçici çözüm)
+                import time  # Zaman modülünü import et
                 start_time = time.time()
                 
-                result = "".join([self.ids_to_tokens.get(i, "") for i in ids])
+                text = "".join([self.ids_to_tokens.get(i, "") for i in ids])
                 
                 # İstatistikleri güncelle
                 self.stats["num_decode_calls"] += 1
                 self.stats["total_decode_time"] += time.time() - start_time
-                return result
+                
+                return text
             
             def get_vocab(self):
                 return dict(self.vocab)
@@ -444,17 +456,60 @@ class TestAllTokenizersPython(unittest.TestCase):
         Returns:
             float: Benzerlik yüzdesi (0-100)
         """
-        # Basitleştirilmiş benzerlik: karakterleri normalize et ve karşılaştır
-        original = ''.join(original.split())
-        decoded = ''.join(decoded.split())
+        # Metinleri normalize et (boşluk karakterlerini standartlaştır)
+        def normalize(text):
+            # Çoklu boşlukları tek boşluğa indir
+            text = re.sub(r'\s+', ' ', text)
+            # Baştaki ve sondaki boşlukları kaldır
+            return text.strip()
         
-        # Minimum uzunluk üzerinden karakterleri karşılaştır
-        min_len = min(len(original), len(decoded))
-        if min_len == 0:
-            return 0.0
+        original_norm = normalize(original)
+        decoded_norm = normalize(decoded)
+        
+        # Levenshtein mesafesini hesapla
+        distance = self._levenshtein_distance(original_norm, decoded_norm)
+        
+        # Maksimum mesafe, en uzun metnin uzunluğudur
+        max_distance = max(len(original_norm), len(decoded_norm))
+        
+        if max_distance == 0:
+            return 100.0  # İki metin de boşsa, tamamen benzerler
             
-        matches = sum(1 for i in range(min_len) if original[i] == decoded[i])
-        return (matches / min_len) * 100
+        # Benzerlik: (1 - normalize_edilmiş_mesafe) * 100
+        similarity = (1 - distance / max_distance) * 100
+        return similarity
+
+    def _levenshtein_distance(self, s1: str, s2: str) -> int:
+        """
+        İki metin arasındaki Levenshtein mesafesini hesaplar.
+        
+        Args:
+            s1: Birinci metin
+            s2: İkinci metin
+            
+        Returns:
+            int: Levenshtein mesafesi
+        """
+        if len(s1) < len(s2):
+            return self._levenshtein_distance(s2, s1)
+        
+        # s1 en az s2 kadar uzunsa
+        if len(s2) == 0:
+            return len(s1)
+        
+        previous_row = range(len(s2) + 1)
+        for i, c1 in enumerate(s1):
+            current_row = [i + 1]
+            for j, c2 in enumerate(s2):
+                # Üç farklı işlem için gereken adımları hesapla:
+                # silme, ekleme, değiştirme
+                insertions = previous_row[j + 1] + 1
+                deletions = current_row[j] + 1
+                substitutions = previous_row[j] + (c1 != c2)
+                current_row.append(min(insertions, deletions, substitutions))
+            previous_row = current_row
+        
+        return previous_row[-1]
 
 
 if __name__ == "__main__":

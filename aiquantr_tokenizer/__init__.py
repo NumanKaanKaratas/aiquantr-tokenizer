@@ -31,7 +31,6 @@ from .tokenizers.factory import (
     load_tokenizer_from_path,
     register_tokenizer_type
 )
-from .tokenizers.evaluation import evaluate_tokenizer
 
 # Yardımcı işlevleri dışa aktar
 from .utils import (

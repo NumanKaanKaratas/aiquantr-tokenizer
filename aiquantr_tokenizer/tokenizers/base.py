@@ -73,7 +73,40 @@ class BaseTokenizer(ABC):
         # Eğitim ile ilgili meta veriler
         self.metadata = {}
         self.is_trained = False
-    
+
+    def normalize_text(self, text: str, rule: str = "nmt_nfkc") -> str:
+        """
+        Metni belirtilen kurala göre normalleştirir.
+        
+        Args:
+            text: Normalleştirilecek metin
+            rule: Normalizasyon kuralı (varsayılan: "nmt_nfkc")
+            
+        Returns:
+            str: Normalleştirilmiş metin
+        """
+        if not text:
+            return ""
+            
+        try:
+            import unicodedata
+            
+            if rule == "nmt_nfkc":
+                text = unicodedata.normalize('NFKC', text)
+                # NMT kurallarını uygula (özel karakterleri kaldır)
+                text = ''.join(c for c in text if not unicodedata.category(c).startswith('C'))
+            elif rule == "nfkc":
+                text = unicodedata.normalize('NFKC', text)
+            elif rule == "nfkd":
+                text = unicodedata.normalize('NFKD', text)
+            elif rule == "nfc":
+                text = unicodedata.normalize('NFC', text)
+            
+            return text
+        except Exception as e:
+            logger.warning(f"Normalizasyon hatası: {e}")
+            return text
+        
     @abstractmethod
     def train(
         self,
