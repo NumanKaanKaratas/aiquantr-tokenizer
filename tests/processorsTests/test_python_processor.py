@@ -2,7 +2,7 @@
 Python kod işleme sınıfı için testler.
 """
 
-from tests.test_processors import BaseProcessorTest
+from .test_processors import BaseProcessorTest
 
 class TestPythonProcessor(BaseProcessorTest):
     """

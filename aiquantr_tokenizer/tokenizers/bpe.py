@@ -22,6 +22,15 @@ from .base import BaseTokenizer, TokenizerTrainer
 # Logger oluştur
 logger = logging.getLogger(__name__)
 
+import sys
+
+if sys.version_info >= (3, 11):
+    # Python 3.11+ için Unicode özellikleri destekleyen desen
+    DEFAULT_SPLIT_PATTERN = r"'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"
+else:
+    # Python 3.10 ve öncesi için uyumlu desen
+    DEFAULT_SPLIT_PATTERN = r"'s|'t|'re|'ve|'m|'ll|'d| ?[A-Za-z]+| ?[0-9]+| ?[^\s\w]+|\s+(?!\S)|\s+"
+
 
 class BPETokenizer(BaseTokenizer):
     """
@@ -37,7 +46,7 @@ class BPETokenizer(BaseTokenizer):
         min_frequency: int = 2,
         special_tokens: Optional[Dict[str, str]] = None,
         character_coverage: float = 1.0,
-        split_pattern: str = r"'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+",
+        split_pattern: str = DEFAULT_SPLIT_PATTERN,
         byte_fallback: bool = True,
         name: Optional[str] = None
     ):

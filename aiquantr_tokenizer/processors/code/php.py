@@ -14,7 +14,6 @@ from aiquantr_tokenizer.processors.code.base import BaseCodeProcessor
 # Logger oluştur
 logger = logging.getLogger(__name__)
 
-
 class PhpProcessor(BaseCodeProcessor):
     """
     PHP kodu işleme sınıfı.
@@ -54,6 +53,9 @@ class PhpProcessor(BaseCodeProcessor):
         self.remove_html = remove_html
         self.normalize_variables = normalize_variables
         
+        # Satır takibi için değişken
+        self.current_line = 1
+        
         # Ek regex desenleri
         self.php_tag_pattern = re.compile(r'<\?php|\?>')
         self.html_pattern = re.compile(r'<[^?].*?>|</.*?>')
@@ -71,6 +73,15 @@ class PhpProcessor(BaseCodeProcessor):
             "variables_normalized": 0
         })
     
+    def _update_line_tracking(self, line_count: int) -> None:
+        """
+        Satır sayımı takibini günceller - iç kullanım için.
+        
+        Args:
+            line_count: Artan satır sayısı
+        """
+        self.current_line += line_count
+        
     def process(self, text: str) -> str:
         """
         PHP kodunu işler.
@@ -148,49 +159,115 @@ class PhpProcessor(BaseCodeProcessor):
     
     def tokenize(self, code: str) -> List[str]:
         """
-        PHP kodunu tokenize eder.
+        PHP kodunu tokenize eder. PHP sözdizimini dikkate alarak kodun anlamlı
+        parçalara ayrılmasını sağlar.
         
         Args:
-            code: Tokenize edilecek kod
-            
+            code: Tokenize edilecek PHP kodu
+                
         Returns:
             List[str]: Tokenlar listesi
         """
-        # Basit bir tokenization uygula
-        # PHP için daha gelişmiş bir tokenizer kullanılabilir (ör. phpparser kütüphanesi)
+        # Satır sayımını sıfırla
+        self.current_line = 1
         
-        # PHP'nin kendi token türlerini taklit eden basit tokenization
         tokens = []
         
-        # Operatörler ve sınırlayıcılar
-        operators = ['+', '-', '*', '/', '%', '=', '==', '===', '!=', '!==', '<', '>', '<=', '>=', 
-                    '&&', '||', '!', '&', '|', '^', '~', '<<', '>>', '.', '.=', 
-                    '+=', '-=', '*=', '/=', '%=', '&=', '|=', '^=', '<<=', '>>=']
+        # Özellikle işlenmesi gereken PHP-spesifik tokenlar
+        php_specific_tokens = {
+            '<?php': '<?php',  # PHP açılış etiketi
+            '<?': '<?',        # PHP kısa açılış etiketi
+            '?>': '?>'         # PHP kapanış etiketi
+        }
         
-        # Daha büyük operatörleri önce kontrol et (örneğin === önce == yerine)
-        operators.sort(key=len, reverse=True)
+        # Operatörler - uzunluğa göre sırala (uzun olanlar önce)
+        operators = [
+            # Karşılaştırma operatörleri
+            '===', '!==', '==', '!=', '<=>', '>=', '<=', '>', '<',
+            # Atama operatörleri
+            '+=', '-=', '*=', '/=', '.=', '%=', '&=', '|=', '^=', '<<=', '>>=', '??=', 
+            # Aritmetik operatörler
+            '+', '-', '*', '/', '%', '**', '++', '--',
+            # String operatörleri 
+            '.',
+            # Mantıksal operatörler
+            '&&', '||', '!', 'and', 'or', 'xor',
+            # Bit operatörleri
+            '&', '|', '^', '~', '<<', '>>',
+            # Null birleştirme operatörü
+            '??',
+            # Atama operatörü
+            '='
+        ]
         
-        # Operatör kalıpları
-        operator_pattern = '|'.join(map(re.escape, operators))
+        # PHP anahtar kelimeleri
+        php_keywords = {
+            'abstract', 'and', 'array', 'as', 'break', 'callable', 'case', 'catch', 'class', 'clone',
+            'const', 'continue', 'declare', 'default', 'die', 'do', 'echo', 'else', 'elseif', 'empty',
+            'enddeclare', 'endfor', 'endforeach', 'endif', 'endswitch', 'endwhile', 'eval', 'exit',
+            'extends', 'final', 'finally', 'fn', 'for', 'foreach', 'function', 'global', 'goto',
+            'if', 'implements', 'include', 'include_once', 'instanceof', 'insteadof', 'interface',
+            'isset', 'list', 'namespace', 'new', 'or', 'print', 'private', 'protected', 'public',
+            'require', 'require_once', 'return', 'static', 'switch', 'throw', 'trait', 'try',
+            'unset', 'use', 'var', 'while', 'xor', 'yield', 'yield from'
+        }
         
-        # Kod üzerinde genel bir tokenizasyon yap
-        pattern = re.compile(
-            r'(' + operator_pattern + r')|'  # operatörler
-            r'(\$\w+)|'                      # değişkenler
-            r'(\b\d+(?:\.\d+)?)|'            # sayılar
-            r'(\b\w+\b)|'                    # tanımlayıcılar
-            r'(\s+)|'                        # boşluklar
-            r'([^\w\s])'                     # diğer karakterler
-        )
+        # Regex tipleri (pre-compile) - performans için
+        patterns: List[Tuple[str, Pattern[str]]] = [
+            ('PHP_TAG', re.compile(r'(<\?php\b|<\?|\?>)')),
+            ('WHITESPACE', re.compile(r'\s+')),
+            ('COMMENT', re.compile(r'(/\*.*?\*/|//.*?$|#.*?$)', re.DOTALL | re.MULTILINE)),
+            ('VARIABLE', re.compile(r'\$[a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*')),
+            ('STRING', re.compile(r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'')),
+            ('NUMBER', re.compile(r'\b(?:0[xX][0-9a-fA-F]+|0[bB][01]+|\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\b')),
+            ('KEYWORD', re.compile(r'\b(' + '|'.join(php_keywords) + r')\b')),
+            ('OPERATOR', re.compile('|'.join(map(re.escape, sorted(operators, key=len, reverse=True))))),
+            ('IDENTIFIER', re.compile(r'\b[a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*\b')),
+            ('SYMBOL', re.compile(r'[\[\]\(\)\{\};:,\.\?\$@]')),
+            ('UNKNOWN', re.compile(r'.'))  # En son eşleşme - herhangi bir karakter
+        ]
         
-        matches = pattern.finditer(code)
-        for match in matches:
-            if match.group(1) or match.group(2) or match.group(3) or match.group(4) or match.group(6):
-                # Boş olmayan token
-                token = match.group(0)
-                if token.strip():  # sadece boşluk olmayan tokenları ekle
-                    tokens.append(token)
-                    self.stats["tokens_processed"] += 1
+        # İşlenecek kodda kalan metin
+        remaining_code = code
+        
+        while remaining_code:
+            matched = False
+            
+            # PHP etiketleri için özel işleme
+            for token_name, pattern in patterns:
+                match = pattern.match(remaining_code)
+                if match:
+                    token_text = match.group(0)
+                    
+                    # PHP etiketlerini özel olarak ele al
+                    if token_name == 'PHP_TAG':
+                        if token_text in php_specific_tokens:
+                            # PHP etiketlerini tek token olarak ekle
+                            tokens.append(token_text)
+                    elif token_name == 'WHITESPACE':
+                        # Whitespace'i atla, ama yeni satırları kaydet
+                        if '\n' in token_text:
+                            self._update_line_tracking(token_text.count('\n'))
+                    elif token_name == 'COMMENT':
+                        # Yorumları atla veya istenirse ekle
+                        if not self.remove_comments:
+                            tokens.append(token_text)
+                        # Yorum içindeki satır sonlarını izle
+                        self._update_line_tracking(token_text.count('\n'))
+                    else:
+                        # Diğer tüm token türleri
+                        tokens.append(token_text)
+                        self.stats["tokens_processed"] += 1
+                    
+                    # Eşleşen metni koddan kaldır
+                    remaining_code = remaining_code[len(token_text):]
+                    matched = True
+                    break
+            
+            # Eşleşme bulunamadıysa (ki bu olmamalı, çünkü UNKNOWN her şeyi eşleştirir)
+            if not matched:
+                # Güvenlik amacıyla - sonsuz döngüden kaçınmak için
+                remaining_code = remaining_code[1:]
         
         return tokens
     

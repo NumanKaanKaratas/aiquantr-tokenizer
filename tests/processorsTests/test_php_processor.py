@@ -2,7 +2,7 @@
 PHP kod işleme sınıfı için testler.
 """
 
-from tests.processorsTests.test_processors import BaseProcessorTest
+from .test_processors import BaseProcessorTest
 
 class TestPhpProcessor(BaseProcessorTest):
     """
@@ -125,10 +125,8 @@ function example($param) {
     return $x + $param;
 }
 ?>"""
-        
         tokens = processor.tokenize(php_code)
-        
         # Tokenization doğru yapıldı mı kontrol et
-        expected_tokens = ["function", "example", "(", "$param", ")", "{", "$x", "=", "10", ";", "return", "$x", "+", "$param", "}", "?>"]
+        expected_tokens = ["function", "example", "(", "$param", ")", "{", "$x", "=", "10", ";", "return", "$x", "+", "$param", ";", "}"]
         for token in expected_tokens:
             self.assertIn(token, tokens)

@@ -1,4 +1,3 @@
-# aiquantr_tokenizer/config/__init__.py
 """
 Tokenizer Prep Config Modülü.
 
@@ -7,11 +6,11 @@ Konfigürasyon dosyalarını okuma, doğrulama ve diğer modüllere sunma işlev
 """
 
 from .config_manager import ConfigManager
-from .config_manager import load_config, validate_config, get_template_path
+from .config_manager import validate_config, get_template_path, _merge_configs
 
 __all__ = [
     "ConfigManager",
-    "load_config",
     "validate_config",
-    "get_template_path"
+    "get_template_path",
+    "_merge_configs"
 ]

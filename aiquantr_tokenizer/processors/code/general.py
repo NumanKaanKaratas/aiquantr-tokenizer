@@ -7,7 +7,7 @@ ve tokenizer eğitimi için hazırlayan sınıfları içerir.
 
 import re
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List, Tuple
 
 from aiquantr_tokenizer.processors.base_processor import BaseProcessor
 
@@ -25,10 +25,15 @@ class CodeProcessor(BaseProcessor):
     
     def __init__(
         self,
+        language_name: Optional[str] = None,
+        file_extensions: Optional[List[str]] = None,
+        comment_prefixes: Optional[List[str]] = None,
+        block_comment_pairs: Optional[List[Tuple[str, str]]] = None,
+        string_delimiters: Optional[List[str]] = None,
         remove_comments: bool = False,
-        normalize_whitespace: bool = True,
         remove_docstrings: bool = False,
         remove_string_literals: bool = False,
+        normalize_whitespace: bool = True,
         keep_indentation: bool = True,
         remove_shebang: bool = True,
         min_code_length: int = 0,
@@ -40,10 +45,15 @@ class CodeProcessor(BaseProcessor):
         CodeProcessor sınıfı başlatıcısı.
         
         Args:
+            language_name: Programlama dili adı (opsiyonel)
+            file_extensions: Dil dosya uzantıları (opsiyonel)
+            comment_prefixes: Satır yorumları için önek listesi (opsiyonel)
+            block_comment_pairs: Blok yorum başlangıç/bitiş çiftleri (opsiyonel)
+            string_delimiters: Dize sınırlayıcılar (opsiyonel)
             remove_comments: Yorumları kaldır (varsayılan: False)
-            normalize_whitespace: Boşlukları normalize et (varsayılan: True)
             remove_docstrings: Belge dizilerini kaldır (varsayılan: False)
             remove_string_literals: Dize değişmezleri kaldır (varsayılan: False)
+            normalize_whitespace: Boşlukları normalize et (varsayılan: True)
             keep_indentation: Girintileri koru (varsayılan: True)
             remove_shebang: Shebang satırlarını kaldır (varsayılan: True)
             min_code_length: Minimum kod uzunluğu (varsayılan: 0)
@@ -52,6 +62,12 @@ class CodeProcessor(BaseProcessor):
             name: İşleyici adı (varsayılan: None)
         """
         super().__init__(name=name)
+        
+        self.language_name = language_name
+        self.file_extensions = file_extensions or []
+        self.comment_prefixes = comment_prefixes or []
+        self.block_comment_pairs = block_comment_pairs or []
+        self.string_delimiters = string_delimiters or ["\"", "'"]
         
         self.remove_comments = remove_comments
         self.normalize_whitespace = normalize_whitespace

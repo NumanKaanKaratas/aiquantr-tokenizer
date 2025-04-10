@@ -194,8 +194,10 @@ class PythonProcessor(BaseCodeProcessor):
                 
                 # Normal değişken tanımlarından tip işaretlerini kaldır
                 else:
-                    # Değişken tanımlarındaki tip işaretlerini kaldır
-                    line = re.sub(r':\s*[A-Za-z0-9_\[\]\'\"\.]+\s*=', '=', line)
+                    # Değişken tanımlarındaki tip işaretlerini kaldır - PEP 8 uyumlu boşluklama ile
+                    line = re.sub(r'(\b[a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*[A-Za-z0-9_\[\]\'\"\.]+\s*=\s*', 
+                                r'\1 = ', 
+                                line)
                 
                 processed_lines.append(line)
             
@@ -279,65 +281,193 @@ class PythonProcessor(BaseCodeProcessor):
             
         return tokens
     
-    def extract_identifiers(self, code: str) -> List[str]:
+    def extract_identifiers(self, code: str) -> list:
         """
-        Python kodundan tanımlayıcıları çıkarır.
+        Python kodundan tanımlayıcıları çıkarır (değişken, fonksiyon, sınıf, modül, parametre ve sınıf özellikleri).
+        Python 2.7 ve tüm Python 3.x sürümleriyle uyumludur.
         
         Args:
-            code: İşlenecek kod
-            
+            code: İşlenecek Python kodu
+                
         Returns:
-            List[str]: Tanımlayıcılar listesi
+            list: Tanımlanan ve kullanılan benzersiz tanımlayıcıların listesi
         """
+        import ast
+        import re
+        import sys
+        
+        # Python 3 için typing modülü ile tip belirtimi, 2.7'de çalışmaz
+        # o yüzden inline olarak kullanmıyoruz
+        
         identifiers = set()
+        is_py2 = sys.version_info[0] == 2
         
         try:
             # AST ağacını parse et
             parsed = ast.parse(code)
             
-            # Fonksiyon ve sınıf tanımlarını bul
+            # AST ağacını dolaş ve tanımlayıcıları topla
             for node in ast.walk(parsed):
+                # PYTHON 2.7 ve 3.x için farklı AST node'ları
+                
                 # Fonksiyon tanımları
                 if isinstance(node, ast.FunctionDef):
                     identifiers.add(node.name)
                     
-                    # Parametre adları
-                    for arg in node.args.args:
-                        identifiers.add(arg.arg)
+                    # Python 2.7 ve 3.x'te parametre node'ları farklıdır
+                    if is_py2:
+                        # Python 2.7'de args.args doğrudan Name node'larıdır
+                        for arg in node.args.args:
+                            if isinstance(arg, ast.Name):
+                                identifiers.add(arg.id)
+                    else:
+                        # Python 3.x'te arg node'ları vardır
+                        for arg in node.args.args:
+                            if hasattr(arg, 'arg'):
+                                identifiers.add(arg.arg)
+                            elif hasattr(arg, 'id'):
+                                identifiers.add(arg.id)
+                    
+                    # Python 3.x'te keyword-only argümanlar
+                    if not is_py2 and hasattr(node.args, 'kwonlyargs'):
+                        for kwarg in node.args.kwonlyargs:
+                            identifiers.add(kwarg.arg)
+                
+                # Sınıf tanımları
+                elif isinstance(node, ast.ClassDef):
+                    identifiers.add(node.name)
                 
                 # Değişken tanımları
                 elif isinstance(node, ast.Assign):
                     for target in node.targets:
                         if isinstance(target, ast.Name):
                             identifiers.add(target.id)
+                        # Tuple unpacking durumunda
+                        elif isinstance(target, ast.Tuple):
+                            for elt in target.elts:
+                                if isinstance(elt, ast.Name):
+                                    identifiers.add(elt.id)
                 
-                # Sınıf tanımları
-                elif isinstance(node, ast.ClassDef):
-                    identifiers.add(node.name)
+                # Değişken isimleri (kullanım)
+                elif isinstance(node, ast.Name):
+                    identifiers.add(node.id)
                 
-                # İmport tanımları
+                # Import ifadeleri
                 elif isinstance(node, ast.Import):
                     for name in node.names:
+                        # Import edilen modül adı
                         identifiers.add(name.name)
+                        # Eğer as ile yeniden adlandırılmışsa
                         if name.asname:
                             identifiers.add(name.asname)
                 
-                # From-import tanımları
+                # From-import ifadeleri
                 elif isinstance(node, ast.ImportFrom):
                     for name in node.names:
                         identifiers.add(name.name)
                         if name.asname:
                             identifiers.add(name.asname)
-            
+                
+                # Sınıf özellikleri (self.attribute gibi)
+                elif isinstance(node, ast.Attribute):
+                    # Özellikle self.xyz şeklindeki özellikleri yakalamak için
+                    if isinstance(node.value, ast.Name) and node.value.id == 'self':
+                        identifiers.add(node.attr)
+                
+                # Python 3.x'e özel arg node - Python 2.7'de bunlar Name node'larıdır
+                elif not is_py2 and isinstance(node, ast.arg) and hasattr(node, 'arg'):
+                    identifiers.add(node.arg)
+                
+                # Comprehension değişkenleri (list/dict comprehension) - Her iki Python sürümünde benzer
+                elif isinstance(node, (ast.ListComp, ast.DictComp, ast.SetComp, ast.GeneratorExp)):
+                    for generator in node.generators:
+                        if isinstance(generator.target, ast.Name):
+                            identifiers.add(generator.target.id)
+                        # Tuple unpacking durumunda
+                        elif isinstance(generator.target, ast.Tuple):
+                            for elt in generator.target.elts:
+                                if isinstance(elt, ast.Name):
+                                    identifiers.add(elt.id)
+                
+                # With ifadeleri için as kısmı
+                # Python 2.7'de withitem node yok, with_items doğrudan With node'da bulunur
+                if not is_py2:
+                    if isinstance(node, ast.withitem) and isinstance(node.optional_vars, ast.Name):
+                        identifiers.add(node.optional_vars.id)
+                else:
+                    if isinstance(node, ast.With) and node.optional_vars and isinstance(node.optional_vars, ast.Name):
+                        identifiers.add(node.optional_vars.id)
+                    
+                    # For döngüsü değişkenleri
+                    elif isinstance(node, ast.For):
+                        if isinstance(node.target, ast.Name):
+                            identifiers.add(node.target.id)
+                        # Tuple unpacking durumunda
+                        elif isinstance(node.target, ast.Tuple):
+                            for elt in node.target.elts:
+                                if isinstance(elt, ast.Name):
+                                    identifiers.add(elt.id)
+                        
+                    # Exception handling değişkenleri - Python sürümlerine uygun şekilde
+                    elif isinstance(node, ast.ExceptHandler):
+                        if is_py2:
+                            if hasattr(node, 'name') and isinstance(node.name, ast.Name):
+                                identifiers.add(node.name.id)
+                        else:  # Python 3.x
+                            if hasattr(node, 'name'):
+                                if node.name is None:  # Exception yakalanıyor ama değişkene atanmıyor
+                                    continue
+                                if isinstance(node.name, str):  # Python 3.8+
+                                    identifiers.add(node.name)
+                                elif isinstance(node.name, ast.Name):  # Python 3.7 ve öncesi
+                                    identifiers.add(node.name.id)
+                    
         except SyntaxError:
-            # AST ayrıştırma hatası (kod hatalı olabilir)
-            # Basit bir regex ile tanımlayıcıları bul
-            identifiers.update(re.findall(r'\bdef\s+(\w+)', code))  # Fonksiyonlar
-            identifiers.update(re.findall(r'\bclass\s+(\w+)', code))  # Sınıflar
-            identifiers.update(re.findall(r'\b(\w+)\s*=', code))  # Değişkenler
+            # AST ayrıştırma hatası durumunda regex ile basit tanımlayıcı çıkarma
+            identifiers.update(re.findall(r'\bdef\s+(\w+)', code))      # Fonksiyon tanımları
+            identifiers.update(re.findall(r'\bclass\s+(\w+)', code))    # Sınıf tanımları
+            identifiers.update(re.findall(r'\b(\w+)\s*=', code))        # Değişken tanımları
+            identifiers.update(re.findall(r'\bself\.(\w+)', code))      # Sınıf özellikleri
+            
+            # Daha eski Python sürümleri için import ifadeleri dikkatlice ele alınmalı
+            import_matches = re.findall(r'(?:^|\s)from\s+([\w.]+)\s+import\s+([\w*,\s]+)(?:\s+as\s+(\w+))?', code)
+            for match in import_matches:
+                module, imports, alias = match
+                if alias:
+                    identifiers.add(alias)
+                for imp in imports.split(','):
+                    imp = imp.strip()
+                    if imp and imp != '*':
+                        identifiers.add(imp)
+                        
+            # Standart import ifadeleri
+            import_matches = re.findall(r'(?:^|\s)import\s+([\w.,\s]+)', code)
+            for match in import_matches:
+                modules = match.split(',')
+                for module in modules:
+                    module = module.strip()
+                    if module:
+                        parts = module.split(' as ')
+                        if len(parts) > 1:
+                            identifiers.add(parts[1].strip())
+                        else:
+                            identifiers.add(module.split('.')[-1])
+            
+        # Genel Python anahtar kelimelerini filtrele
+        python_keywords = {
+            'and', 'as', 'assert', 'break', 'class', 'continue', 
+            'def', 'del', 'elif', 'else', 'except', 'exec', 'finally', 'for',
+            'from', 'global', 'if', 'import', 'in', 'is', 'lambda', 'not',
+            'or', 'pass', 'print', 'raise', 'return', 'try', 'while', 'with', 'yield',
+            # Python 3 anahtar kelimeleri
+            'False', 'None', 'True', 'nonlocal', 'async', 'await'
+        }
+        
+        # Anahtar kelimeleri filtrele
+        identifiers = {id for id in identifiers if id not in python_keywords}
         
         return list(identifiers)
-    
+        
     def extract_functions(self, code: str) -> List[Dict[str, Any]]:
         """
         Python kodundan fonksiyon tanımlarını çıkarır.
